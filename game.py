@@ -5,7 +5,7 @@ import secrets
 from tabulate import tabulate
 from colorama import init, Fore
 
-init()
+
 
 
 def parse_arguments():
