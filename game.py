@@ -5,9 +5,6 @@ import secrets
 from tabulate import tabulate
 from colorama import init, Fore
 
-
-
-
 def parse_arguments():
     secret_key = secrets.token_bytes(32)
     if len(sys.argv) < 4:
@@ -31,11 +28,9 @@ def parse_arguments():
 
     return secret_key, available_dice
 
-
 def calculate_win_probabilities(dice_list):
     size = len(dice_list)
-    headers = [Fore.BLUE + "User dice v" + Fore.RESET] + [Fore.BLUE + ",".join(map(str, dice)) + Fore.RESET for dice in
-                                                          dice_list]
+    headers = [Fore.BLUE + "User dice v" + Fore.RESET] + [Fore.BLUE + ",".join(map(str, dice)) + Fore.RESET for dice in dice_list]
     table = []
     for i in range(size):
         row = [",".join(map(str, dice_list[i]))]
@@ -58,7 +53,6 @@ def calculate_win_probabilities(dice_list):
     print("This table shows the probability of one die beating another.")
     print(tabulate(table, headers=headers, tablefmt="grid"))
     print()
-
 
 def determine_first_move(secret_key, available_dice):
     computer_choice = secrets.randbelow(2)
@@ -85,7 +79,6 @@ def determine_first_move(secret_key, available_dice):
     print(f"My selection: {computer_choice} (KEY={secret_key.hex()})")
 
     return int(user_selection) == computer_choice
-
 
 def select_dice(available_dice, user_first, computer_dice=None):
     if user_first:
@@ -126,16 +119,14 @@ def select_dice(available_dice, user_first, computer_dice=None):
 
     return player_dice, computer_dice
 
-
-def generate_roll(secret_key, dice_length, player_dice, computer_dice):
+def generate_roll(secret_key, dice_length, label, player_dice, computer_dice, other_user_number=None):
     computer_roll = secrets.randbelow(dice_length)
     message_roll = str(computer_roll).encode()
     hmac_value_roll = hmac.new(secret_key, message_roll, hashlib.sha3_256).hexdigest()
-    print(
-        f"It's time for my roll.\nI selected a random value in the range 0..{dice_length - 1} (HMAC={hmac_value_roll})")
+    print(f"It's time for {label}'s roll.\nI selected a random value in the range 0..{dice_length - 1} (HMAC={hmac_value_roll})")
 
     while True:
-        user_input = input(f"Enter your number (0 to {dice_length - 1}): ").strip()
+        user_input = input(f"Enter your number (0 to {dice_length - 1}) for {label}: ").strip()
         if user_input == "?":
             calculate_win_probabilities([player_dice, computer_dice])
             continue
@@ -145,7 +136,7 @@ def generate_roll(secret_key, dice_length, player_dice, computer_dice):
         user_number = int(user_input)
         break
 
-    print(f"My roll was: {computer_roll}")
+    print(f"My roll for {label} was: {computer_roll}")
     print(f"HMAC KEY: {secret_key.hex()}")
     expected_hmac = hmac.new(secret_key, str(computer_roll).encode(), hashlib.sha3_256).hexdigest()
     if expected_hmac != hmac_value_roll:
@@ -154,16 +145,14 @@ def generate_roll(secret_key, dice_length, player_dice, computer_dice):
     else:
         print("HMAC verified successfully.")
 
-    final_index = (computer_roll + user_number) % dice_length
+    final_index = (computer_roll + (user_number if other_user_number is None else other_user_number)) % dice_length
     return computer_roll, user_number, final_index
 
+def display_results(player_dice, computer_dice, player_roll, computer_roll):
+    player_result = player_dice[player_roll]
+    computer_result = computer_dice[computer_roll]
 
-def display_results(player_dice, computer_dice, computer_roll, user_number, final_index, dice_length):
-    player_result = player_dice[final_index]
-    computer_result = computer_dice[final_index]
-
-    print(f"Final dice index: {final_index}")
-    print(f"The fair number generation result is {computer_roll} + {user_number} = {final_index} (mod {dice_length}).")
+    print(f"\nResults:")
     print(f"Your roll result is {player_result}.")
     print(f"My roll result is {computer_result}.")
 
@@ -174,15 +163,16 @@ def display_results(player_dice, computer_dice, computer_roll, user_number, fina
     else:
         print("Result is a tie.")
 
-
 def main():
     secret_key, available_dice = parse_arguments()
     user_first = determine_first_move(secret_key, available_dice)
     player_dice, computer_dice = select_dice(available_dice, user_first)
     dice_length = len(computer_dice)
-    computer_roll, user_number, final_index = generate_roll(secret_key, dice_length, player_dice, computer_dice)
-    display_results(player_dice, computer_dice, computer_roll, user_number, final_index, dice_length)
-
+    computer_roll_p, user_num_p, _ = generate_roll(secret_key, dice_length, "Player", player_dice, computer_dice)
+    computer_roll_c, user_num_c, _ = generate_roll(secret_key, dice_length, "Computer", player_dice, computer_dice)
+    player_roll = (computer_roll_p + user_num_c) % dice_length
+    computer_roll = (computer_roll_c + user_num_p) % dice_length
+    display_results(player_dice, computer_dice, player_roll, computer_roll)
 
 if __name__ == "__main__":
     main()
